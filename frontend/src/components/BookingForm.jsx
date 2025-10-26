@@ -45,8 +45,22 @@ const BookingForm = () => {
 
     setIsSubmitting(true);
     try {
-      const result = await mockBookingSubmit(formData);
-      if (result.success) {
+      // Convert camelCase to snake_case for backend API
+      const apiData = {
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
+        service_type: formData.serviceType,
+        pickup_location: formData.pickupLocation,
+        drop_location: formData.dropLocation,
+        date: formData.date,
+        time: formData.time,
+        notes: formData.notes
+      };
+
+      const response = await axios.post(`${API}/bookings`, apiData);
+      
+      if (response.data.success) {
         toast.success('Booking request submitted! We will call you back soon.');
         // Reset form
         setFormData({
@@ -62,6 +76,7 @@ const BookingForm = () => {
         });
       }
     } catch (error) {
+      console.error('Booking submission error:', error);
       toast.error('Failed to submit booking. Please try again.');
     } finally {
       setIsSubmitting(false);
