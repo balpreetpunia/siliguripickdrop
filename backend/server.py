@@ -205,6 +205,58 @@ async def get_status_checks():
     
     return status_checks
 
+# Booking Routes
+@api_router.post("/bookings")
+async def create_booking(booking_data: BookingCreate):
+    try:
+        # Create booking object
+        booking = Booking(**booking_data.model_dump())
+        
+        # Convert to dict and serialize datetime to ISO string for MongoDB
+        doc = booking.model_dump()
+        doc['created_at'] = doc['created_at'].isoformat()
+        doc['updated_at'] = doc['updated_at'].isoformat()
+        
+        # Insert into database
+        result = await db.bookings.insert_one(doc)
+        
+        if result.inserted_id:
+            logger.info(f"Booking created: {booking.booking_id}")
+            
+            # Send email notification (don't fail if email fails)
+            email_sent = await send_booking_email(booking)
+            
+            return {
+                "success": True,
+                "message": "Booking request submitted successfully! We will call you back soon.",
+                "booking_id": booking.booking_id,
+                "email_sent": email_sent
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create booking")
+            
+    except Exception as e:
+        logger.error(f"Error creating booking: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/bookings")
+async def get_bookings():
+    try:
+        bookings = await db.bookings.find({}, {"_id": 0}).to_list(1000)
+        
+        # Convert ISO string timestamps back to datetime objects
+        for booking in bookings:
+            if isinstance(booking.get('created_at'), str):
+                booking['created_at'] = datetime.fromisoformat(booking['created_at'])
+            if isinstance(booking.get('updated_at'), str):
+                booking['updated_at'] = datetime.fromisoformat(booking['updated_at'])
+        
+        return {"success": True, "bookings": bookings}
+        
+    except Exception as e:
+        logger.error(f"Error fetching bookings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 
